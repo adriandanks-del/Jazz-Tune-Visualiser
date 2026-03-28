@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Bass Jazz Chord Sequencer — Professional Edition</title>
+<title>Jazz Tune Visualiser</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
 <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
@@ -1263,6 +1263,8 @@ input[type="range"]:not(.range-thumb):focus-visible::-moz-range-thumb {
 <div id="root"></div>
 <script>
 (function() {
+  let fullscreenAttempted = false;
+
   function lockLandscape() {
     if (screen.orientation && screen.orientation.lock) {
       screen.orientation.lock('landscape').catch(function() {});
@@ -1270,24 +1272,34 @@ input[type="range"]:not(.range-thumb):focus-visible::-moz-range-thumb {
   }
   
   function enterFullscreen() {
-    const root = document.getElementById('root');
-    if (root && root.requestFullscreen) {
-      root.requestFullscreen().catch(function() {});
-    } else if (root && root.webkitRequestFullscreen) {
-      root.webkitRequestFullscreen();
+    if (document.fullscreenElement || document.webkitFullscreenElement) return;
+    const target = document.documentElement || document.getElementById('root');
+    if (target && target.requestFullscreen) {
+      target.requestFullscreen().catch(function() {});
+    } else if (target && target.webkitRequestFullscreen) {
+      target.webkitRequestFullscreen();
     }
+  }
+
+  function tryAutoFullscreen() {
+    if (fullscreenAttempted) return;
+    fullscreenAttempted = true;
+    enterFullscreen();
   }
   
   // Try locking on page load
   lockLandscape();
+  tryAutoFullscreen();
   
   // On first user interaction: request fullscreen and lock landscape
   function handleFirstInteraction() {
     lockLandscape();
-    enterFullscreen();
+    tryAutoFullscreen();
   }
   
   document.addEventListener('pointerdown', handleFirstInteraction, { once: true });
+  document.addEventListener('keydown', handleFirstInteraction, { once: true });
+  window.addEventListener('load', tryAutoFullscreen, { once: true });
   
   // Lock on fullscreen or orientation change
   document.addEventListener('fullscreenchange', function() {
@@ -3619,8 +3631,8 @@ This panel is where you explore suggested scales and licks for the current chord
 
 - \`Common Tones\`: jumps to the safest shared-note material between the current harmony and where it is heading.
 - \`Categories\`: takes you to the grouped suggestion lists such as best fits, alternatives, blues colours, and genre ideas.
-- \`Learn Scales\`: opens the stripped-down practice version so you can hear and see one scale idea more clearly.
 - \`?\`: opens this quick guide.
+- \`Learn More\`: Secret area full of wisdom and wizards.
 - \`Save Scale\`: adds a scale layer over the chord tones already stored on a chord.
 - \`Clear Scale\`: removes the currently shown scale from the instrument.
 
@@ -3780,6 +3792,46 @@ The panel works the same way as Scales/Licks, but the progression is simplified 
 ## Moving on
 
 When you are ready to apply what you have learned, use the \`Scales/Licks\` button to return to the main panel and work the scale through a full tune.`,
+
+  'scaleTheory': `# Scales — Scale Theory View
+
+## What this panel shows
+
+This is the Scale Theory view. It organises scale information around the chord currently in focus, giving you a deeper look at why a scale works before you commit to playing it.
+
+The panel is split into four boxes:
+
+- **Current Mode**: the top-ranked scale recommendation for this chord from the analysis engine. This updates automatically as you step Fwd / Back through the progression. If you picked a scale manually via Learn More, this box respects your choice instead.
+- **Mode Info**: shows the full family table for the current mode — all seven modes of the parent scale (Major, Harmonic Minor, Melodic Minor, etc.) with their degree names and typical chord types. For standalone colour scales (Whole Tone, Diminished, Blues, etc.) this shows a short description instead.
+- **Scale Use**: a practical plain-English summary of where and how the current scale is typically used, plus target tones and what harmony it works over.
+- **Load Exercise**: lets you load a practice loop directly into the panel so you can hear the scale in context.
+
+## The family table (Mode Info)
+
+The table shows every mode of the parent family — for example, if the current mode is Dorian, you see all seven Major family modes in order.
+
+The highlighted row is the current mode. The other rows show the sibling modes and their relative roots so you can see the family as a whole, and understand how the current mode fits into it.
+
+This is useful for:
+- Spotting which mode you are in at a glance
+- Understanding the sound relative to the parent key
+- Choosing a sibling mode for a connected sound on the next chord
+
+## How the Current Mode box is filled
+
+When you step Fwd / Back, the app reads the progression analysis and fills the Current Mode box with the best-fit scale for the current chord — no manual selection needed.
+
+If you arrived here via the **Learn More** button in Scales/Licks, the scale you chose there is locked in and the box shows that choice instead.
+
+To reset back to the analysis recommendation, return to Scales/Licks and step Fwd / Back again.
+
+## Buttons
+
+- \`Scales/Licks\`: returns to the main suggestion panel.
+- \`Theory\`: opens the Chord Progression Analysis panel for deeper harmony context.
+- \`Fwd / Back\`: step through the progression; Current Mode updates to follow the top recommendation for each chord.
+- \`?\`: opens this help screen.
+`,
 
   'chordPanels': `# Chord Panels Quick Guide
 
@@ -7239,7 +7291,9 @@ function Fretboard({ isManualMode, chords, chordSets, currentIndex, pendingIndex
   const [flashingLickKey, setFlashingLickKey] = React.useState(null);
   const [flashingSavedScaleLabel, setFlashingSavedScaleLabel] = React.useState(false);
   const [learnScalesModalOpen, setLearnScalesModalOpen] = React.useState(false);
-  const learnScalesHelpText = PANEL_HELP_TEXTS['learnScales'];
+  const learnScalesHelpText = activeOptionView === 'scale-theory'
+    ? PANEL_HELP_TEXTS['scaleTheory']
+    : PANEL_HELP_TEXTS['learnScales'];
   const quickActionHelpDefaultText = PANEL_HELP_TEXTS['scalesLicks'];
   const swipeStartRef = useRef(null);
   const swipeLastTriggerMsRef = useRef(0);
@@ -9114,7 +9168,7 @@ function Fretboard({ isManualMode, chords, chordSets, currentIndex, pendingIndex
       {learnScalesModalOpen ? (
         <div className="warning-modal-overlay" role="dialog" aria-modal="true" aria-label="Learn Scales help">
           <div className="warning-modal">
-            <h3>Learn Scales</h3>
+            <h3>{activeOptionView === 'scale-theory' ? 'Scales — Quick Guide' : 'Learn Scales'}</h3>
             <div style={{ marginTop: 8, maxHeight: '56vh', overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 12px' }}>
               {renderSimpleMarkdown(learnScalesHelpText)}
             </div>
@@ -13874,11 +13928,6 @@ function App(){
               <h1>Jazz Tune Visualiser</h1>
             </button>
             <button className="btn options-panel-info" type="button" onClick={handleTitleHelpClick} title="Show intro/help" style={{fontSize:'16px',fontWeight:'700',lineHeight:1,marginLeft:'6px',width:'28px',height:'28px',padding:0,flexShrink:0}}>?</button>
-            <div className="chord-nav-debug">
-              <span>C: <strong>{getChordDisplayText(chords[currentIdx])}</strong></span>
-              <span className="chord-nav-arrow">→</span>
-              <span>D: <strong>{pendingIdx !== null ? getChordDisplayText(chords[pendingIdx]) : '—'}</strong></span>
-            </div>
           </div>
           <div className="app-actions">
             <div className="transport-controls">
